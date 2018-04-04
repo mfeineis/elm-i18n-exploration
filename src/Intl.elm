@@ -1,5 +1,6 @@
-module Intl exposing (TranslationKey, TranslationMode(..), i18n)
+module Intl exposing (TranslationKey, TranslationMode(..), TranslationValue, i18n, lookup)
 
+import Dict exposing (Dict)
 import Html exposing (Attribute)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -7,6 +8,10 @@ import Json.Decode as Decode exposing (Decoder)
 
 
 type alias TranslationKey =
+    String
+
+
+type alias TranslationValue =
     String
 
 
@@ -31,6 +36,16 @@ i18n key tagger mode =
       else
         Attr.class ""
     ]
+
+
+lookup : TranslationValue -> TranslationKey -> Dict TranslationKey TranslationValue -> String
+lookup defaultValue key lookup =
+    case Dict.get key lookup of
+        Nothing ->
+            defaultValue
+
+        Just value ->
+            value
 
 
 
