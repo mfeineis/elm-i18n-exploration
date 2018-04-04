@@ -5,7 +5,6 @@ import Html.Attributes as Attr
 import Html.Events as Events exposing (onClick)
 import Intl exposing (TranslationKey, TranslationMode(..))
 import Json.Decode as Decode exposing (Decoder, Value)
-import Json.Encode as Encode
 
 
 main : Program Never Model Msg
@@ -30,7 +29,8 @@ type alias Model =
 
 
 type Msg
-    = ToggleTranslationMode
+    = UpdateTranslation TranslationKey String
+    | ToggleTranslationMode
 
 
 init : ( Model, Cmd Msg )
@@ -43,6 +43,10 @@ update msg model =
     case msg of
         ToggleTranslationMode ->
             model |> toggleTranslationMode |> withoutCmd
+
+        UpdateTranslation key value ->
+            Debug.log ("UpdateTranslation " ++ key ++ ": " ++ value)
+                (model |> withoutCmd)
 
 
 toggleTranslationMode : { a | translationMode : TranslationMode } -> { a | translationMode : TranslationMode }
@@ -61,17 +65,30 @@ toggleTranslationMode ({ translationMode } as model) =
 
 view : Model -> Html Msg
 view ({ translationMode } as model) =
+    let
+        editing =
+            translationMode == Editing
+    in
     Html.div
-        [ if translationMode == Editing then
-            Attr.class "i18n"
+        [ if editing then
+            Attr.class "i18n--editing"
           else
             Attr.class ""
         ]
-        [ baseStyle
-        , toggleModeButton model
+        [ toolbar model
         , Html.div
-            (i18n "some.key" model ++ [])
+            (i18n "some.label" model ++ [])
             [ Html.text "Hello, World!"
+            ]
+        , Html.button
+            (i18n "some.button" model
+                ++ [ if editing then
+                        Attr.class ""
+                     else
+                        onClick ToggleTranslationMode
+                   ]
+            )
+            [ Html.text "Some Button"
             ]
         ]
 
@@ -79,11 +96,18 @@ view ({ translationMode } as model) =
 toggleModeButton : { a | translationMode : TranslationMode } -> Html Msg
 toggleModeButton model =
     Html.button
-        (i18n "some.button" model
-            ++ [ onClick ToggleTranslationMode
-               ]
-        )
+        [ onClick ToggleTranslationMode
+        ]
         [ Html.text "Switch"
+        ]
+
+
+toolbar : { a | translationMode : TranslationMode } -> Html Msg
+toolbar model =
+    Html.div []
+        [ baseStyle
+        , toggleModeButton model
+        , Html.hr [] []
         ]
 
 
@@ -91,9 +115,9 @@ toggleModeButton model =
 -- Helpers
 
 
-i18n : TranslationKey -> { a | translationMode : TranslationMode } -> List (Attribute msg)
+i18n : TranslationKey -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
 i18n key { translationMode } =
-    Intl.i18n key translationMode
+    Intl.i18n key (UpdateTranslation key) translationMode
 
 
 withCmds : List (Cmd msg) -> model -> ( model, Cmd msg )
@@ -120,8 +144,8 @@ html {
     box-sizing: inherit;
 }
 
-.i18n [data-i18n] {
-    border: 1px solid red;
+.i18n--editing [data-i18n] {
+    border: 3px dotted red;
 }
 
 pre {
