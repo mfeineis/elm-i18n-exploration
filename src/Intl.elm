@@ -33,10 +33,12 @@ i18n key tagger mode =
     ]
 
 
+
 -- Custom decoder is necessary, because the default decoder looks for
 -- `event.target.value`, which doesn't exist on e.g. <div>s.
 -- See https://github.com/elm-lang/html/issues/24
 
+
 innerHtmlDecoder : Decoder String
 innerHtmlDecoder =
-    Decode.at ["target", "innerHTML"] Decode.string
+    Decode.at [ "target", "innerHTML" ] Decode.string
