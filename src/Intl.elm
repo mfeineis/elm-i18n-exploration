@@ -4,7 +4,8 @@ import Html exposing (Attribute)
 import Html.Attributes as Attr
 
 
-type alias TranslationKey = String
+type alias TranslationKey =
+    String
 
 
 type TranslationMode

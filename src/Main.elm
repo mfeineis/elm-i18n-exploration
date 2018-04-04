@@ -79,9 +79,9 @@ view ({ translationMode } as model) =
 toggleModeButton : { a | translationMode : TranslationMode } -> Html Msg
 toggleModeButton model =
     Html.button
-        (i18n "some.button" model ++
-            [ onClick ToggleTranslationMode
-            ]
+        (i18n "some.button" model
+            ++ [ onClick ToggleTranslationMode
+               ]
         )
         [ Html.text "Switch"
         ]
