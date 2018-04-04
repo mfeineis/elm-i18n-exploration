@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>elm-i18n-exploration</title>
+</head>
+<body>
+    <script src="_compile/src/Main.elm"></script>
+    <script>
+
+    const app = Elm.Main.fullscreen();
+    app.ports.storeTranslations.subscribe(it => {
+        console.log('app.ports.storeTranslations ->', it);
+    });
+
+    </script>
+</body>
+</html>

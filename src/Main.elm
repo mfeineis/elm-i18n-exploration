@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Dict exposing (Dict)
 import Html exposing (Attribute, Html)
@@ -6,6 +6,10 @@ import Html.Attributes as Attr
 import Html.Events as Events exposing (onClick)
 import Intl exposing (TranslationKey, TranslationMode(..), TranslationValue)
 import Json.Decode as Decode exposing (Decoder, Value)
+import Json.Encode as Encode
+
+
+port storeTranslations : Value -> Cmd msg
 
 
 main : Program Never Model Msg
@@ -37,36 +41,44 @@ type Msg
 
 init : ( Model, Cmd Msg )
 init =
-    ( { i18nLookup = Dict.empty, translationMode = ReadOnly }, Cmd.none )
+    ( { i18nLookup = Dict.empty
+      , translationMode = ReadOnly
+      }
+    , Cmd.none
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ToggleTranslationMode ->
-            model |> toggleTranslationMode |> withoutCmd
+            model |> toggleTranslationMode
 
         UpdateTranslation key value ->
-            Debug.log ("UpdateTranslation " ++ key ++ ": " ++ value)
-                (model |> updateTranslation key value |> withoutCmd)
+            model |> updateTranslation key value
 
 
-toggleTranslationMode : { a | translationMode : TranslationMode } -> { a | translationMode : TranslationMode }
-toggleTranslationMode ({ translationMode } as model) =
+toggleTranslationMode : Model -> ( Model, Cmd Msg )
+toggleTranslationMode ({ i18nLookup, translationMode } as model) =
     case translationMode of
         Editing ->
             Debug.log "Done editing..."
                 { model | translationMode = ReadOnly }
+                |> withCmds
+                    [ storeTranslations (encodeLookup i18nLookup)
+                    ]
 
         ReadOnly ->
             { model | translationMode = Editing }
+                |> withoutCmd
 
 
-updateTranslation : TranslationKey -> TranslationValue -> Model -> Model
+updateTranslation : TranslationKey -> TranslationValue -> Model -> ( Model, Cmd Msg )
 updateTranslation key value ({ i18nLookup } as model) =
     { model
         | i18nLookup = Dict.insert key value i18nLookup
     }
+        |> withoutCmd
 
 
 
@@ -98,13 +110,13 @@ view ({ i18nLookup, translationMode } as model) =
 
 
 someButton : Model -> List (Attribute Msg) -> Html Msg
-someButton model attrs =
-    i15d Html.button "Some Button" "some.button" attrs model
+someButton =
+    i15d Html.button "Some Button" "some.button"
 
 
 someLabel : Model -> List (Attribute Msg) -> Html Msg
-someLabel model attrs =
-    i15d Html.div "Hello, World!" "some.label" attrs model
+someLabel =
+    i15d Html.div "Hello, World!" "some.label"
 
 
 toggleModeButton : { a | translationMode : TranslationMode } -> Html Msg
@@ -129,8 +141,8 @@ toolbar model =
 -- Helpers
 
 
-i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> List (Attribute Msg) -> Model -> Html Msg
-i15d element defaultValue key attrs ({ i18nLookup, translationMode } as model) =
+i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
+i15d element defaultValue key ({ i18nLookup, translationMode } as model) attrs =
     element (i18n key model ++ attrs)
         [ if translationMode == Editing then
             Html.text defaultValue
@@ -142,6 +154,18 @@ i15d element defaultValue key attrs ({ i18nLookup, translationMode } as model) =
 i18n : TranslationKey -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
 i18n key { translationMode } =
     Intl.i18n key (UpdateTranslation key) translationMode
+
+
+encodeLookup : Dict TranslationKey TranslationValue -> Value
+encodeLookup =
+    encodeDict identity Encode.string
+
+
+encodeDict : (comparable -> String) -> (v -> Value) -> Dict comparable v -> Value
+encodeDict toKey toValue dict =
+    Dict.toList dict
+        |> List.map (\( key, value ) -> ( toKey key, toValue value ))
+        |> Encode.object
 
 
 withCmds : List (Cmd msg) -> model -> ( model, Cmd msg )
