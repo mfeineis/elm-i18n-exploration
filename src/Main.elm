@@ -30,7 +30,9 @@ subscriptions model =
 
 
 type alias Model =
-    { history : History AppModel
+    { focusedTranslatable : TranslationKey
+    , focusedValue : TranslationValue
+    , history : History AppModel
     , i18nLookup : Dict TranslationKey TranslationValue
     , translationMode : TranslationMode
     }
@@ -38,6 +40,7 @@ type alias Model =
 
 type Msg
     = AppMsg AppMsg
+    | FocusTranslatable TranslationKey TranslationValue
     | HistoryMsg HistoryMsg
     | UpdateTranslation TranslationKey TranslationValue
     | ToggleTranslationMode
@@ -59,7 +62,9 @@ type alias AppModel =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { history = History.init { counter = 0 }
+    ( { focusedTranslatable = ""
+      , focusedValue = ""
+      , history = History.init { counter = 0 }
       , i18nLookup = Dict.empty
       , translationMode = ReadOnly
       }
@@ -87,6 +92,16 @@ update msg ({ history, translationMode } as model) =
                     )
             else
                 ( model, Cmd.none )
+
+        FocusTranslatable key value ->
+            let
+                focus model =
+                    { model
+                        | focusedTranslatable = key
+                        , focusedValue = value
+                    }
+            in
+            model |> Debug.log ("Focusing: " ++ key) |> focus |> withoutCmd
 
         HistoryMsg historyMsg ->
             model |> handleHistoryMsg historyMsg
@@ -231,18 +246,26 @@ historyToolbar { history } =
 
 
 i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
-i15d element defaultValue key ({ i18nLookup, translationMode } as model) attrs =
-    element (i18n key model ++ attrs)
-        [ if translationMode == Editing then
-            Html.text ("[" ++ defaultValue ++ "]")
+i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, translationMode } as model) attrs =
+    let
+        value =
+            if focusedTranslatable == key then
+                focusedValue
+            else
+                Intl.lookup defaultValue key i18nLookup
+    in
+    element (i18n key value model ++ attrs)
+        [ if focusedTranslatable == key && translationMode == Editing then
+            -- While the element is focused we don't want Elm to tinker with the node
+            Html.text focusedValue
           else
             Html.text (Intl.lookup defaultValue key i18nLookup)
         ]
 
 
-i18n : TranslationKey -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
-i18n key { translationMode } =
-    Intl.i18n key (UpdateTranslation key) translationMode
+i18n : TranslationKey -> TranslationValue -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
+i18n key value { translationMode } =
+    Intl.i18n key (FocusTranslatable "" "") (FocusTranslatable key value) (UpdateTranslation key) translationMode
 
 
 encodeLookup : Dict TranslationKey TranslationValue -> Value

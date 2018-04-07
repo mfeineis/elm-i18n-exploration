@@ -20,8 +20,8 @@ type TranslationMode
     | ReadOnly
 
 
-i18n : TranslationKey -> (String -> msg) -> TranslationMode -> List (Attribute msg)
-i18n key tagger mode =
+i18n : TranslationKey -> msg -> msg -> (String -> msg) -> TranslationMode -> List (Attribute msg)
+i18n key captureBlur captureFocus mapInput mode =
     let
         editable =
             mode == Editing
@@ -32,7 +32,15 @@ i18n key tagger mode =
       else
         Attr.class ""
     , if editable then
-        Events.on "input" (Decode.map tagger innerTextDecoder)
+        Events.on "input" (Decode.map mapInput innerTextDecoder)
+      else
+        Attr.class ""
+    , if editable then
+        Events.onFocus captureFocus
+      else
+        Attr.class ""
+    , if editable then
+        Events.onBlur captureBlur
       else
         Attr.class ""
     ]
