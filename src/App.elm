@@ -3,6 +3,7 @@ module App exposing (Intent, Model, init, vigor)
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
 import Html.Events as Events exposing (onClick)
+import Intl
 import Vigor exposing (Recipe, Vigor)
 
 
@@ -44,6 +45,15 @@ view { counter } =
         , Html.span [] [ Html.text (toString counter) ]
         ]
 
+
+someButton : Intl.Context -> List (Attribute Intl.Msg) -> Html Intl.Msg
+someButton =
+    Intl.translatable Html.button "Some Button" "some.button"
+
+
+someLabel : Intl.Context -> List (Attribute Intl.Msg) -> Html Intl.Msg
+someLabel =
+    Intl.translatable Html.div "Hello, World!" "some.label"
 
 
 --view : ctx -> Model -> List (Html Intent)
