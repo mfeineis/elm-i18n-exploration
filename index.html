@@ -8,9 +8,12 @@
     <script src="_compile/src/Main.elm"></script>
     <script>
 
-    const app = Elm.Main.fullscreen();
+    const app = Elm.Main.fullscreen({
+        translations: JSON.parse(localStorage.getItem('translations') || '{}'),
+    });
     app.ports.storeTranslations.subscribe(it => {
         console.log('app.ports.storeTranslations ->', it);
+        localStorage.setItem('translations', JSON.stringify(it));
     });
 
     </script>

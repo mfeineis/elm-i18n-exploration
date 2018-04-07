@@ -13,9 +13,9 @@ import Json.Encode as Encode
 port storeTranslations : Value -> Cmd msg
 
 
-main : Program Never Model Msg
+main : Program Value Model Msg
 main =
-    Html.program
+    Html.programWithFlags
         { init = init
         , subscriptions = subscriptions
         , update = update
@@ -68,13 +68,38 @@ type alias AppModel =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+type alias Flags =
+    { translations : Dict TranslationKey TranslationValue
+    }
+
+
+flagsDecoder : Decoder Flags
+flagsDecoder =
+    Decode.map Flags
+        (Decode.field "translations" (Decode.dict Decode.string))
+
+
+init : Value -> ( Model, Cmd Msg )
+init jsonFlags =
+    let
+        flags =
+            case Decode.decodeValue flagsDecoder jsonFlags of
+                Ok it ->
+                    it
+
+                Err reason ->
+                    Debug.log ("Flags invalid: " ++ reason)
+                        { translations = Dict.empty
+                        }
+
+        _ =
+            Debug.log "flags: " flags
+    in
     ( { focusedTranslatable = ""
       , focusedValue = ""
       , history = History.init { counter = 0 }
       , historyMode = Interactive
-      , i18nLookup = Dict.empty
+      , i18nLookup = flags.translations
       , translationMode = NotEditing
       }
     , Cmd.none
@@ -340,6 +365,12 @@ baseStyle =
 html {
     box-sizing: border-box;
 }
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
 *, *:before, *:after {
     box-sizing: inherit;
 }
