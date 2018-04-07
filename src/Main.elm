@@ -4,7 +4,7 @@ import Dict exposing (Dict)
 import History exposing (History)
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
-import Html.Events as Events exposing (onClick)
+import Html.Events as Events exposing (onCheck, onClick)
 import Intl exposing (TranslationKey, TranslationMode(..), TranslationValue)
 import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
@@ -34,6 +34,7 @@ type alias Model =
     { focusedTranslatable : TranslationKey
     , focusedValue : TranslationValue
     , history : History AppModel
+    , historyMode : HistoryMode
     , i18nLookup : Dict TranslationKey TranslationValue
     , translationMode : TranslationMode
     }
@@ -43,13 +44,19 @@ type Msg
     = AppMsg AppMsg
     | FocusTranslatable TranslationKey TranslationValue
     | HistoryMsg HistoryMsg
-    | UpdateTranslation TranslationKey TranslationValue
+    | ToggleHistoryMode Bool
     | ToggleTranslationMode
+    | UpdateTranslation TranslationKey TranslationValue
 
 
 type HistoryMsg
     = StepBack
     | StepForward
+
+
+type HistoryMode
+    = Interactive
+    | ReadOnly
 
 
 type AppMsg
@@ -66,18 +73,19 @@ init =
     ( { focusedTranslatable = ""
       , focusedValue = ""
       , history = History.init { counter = 0 }
+      , historyMode = Interactive
       , i18nLookup = Dict.empty
-      , translationMode = ReadOnly
+      , translationMode = NotEditing
       }
     , Cmd.none
     )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ history, translationMode } as model) =
+update msg ({ history, historyMode, translationMode } as model) =
     case msg of
         AppMsg appMsg ->
-            if translationMode == ReadOnly then
+            if historyMode == Interactive && translationMode == NotEditing then
                 let
                     ( appModel, cmd ) =
                         History.present history
@@ -92,7 +100,7 @@ update msg ({ history, translationMode } as model) =
                     , cmd
                     )
             else
-                ( model, Cmd.none )
+                model |> Debug.log ("Not interactive! Dropping " ++ toString appMsg) |> withoutCmd
 
         FocusTranslatable key value ->
             let
@@ -102,10 +110,23 @@ update msg ({ history, translationMode } as model) =
                         , focusedValue = value
                     }
             in
-            model |> Debug.log ("Focusing: " ++ key) |> focus |> withoutCmd
+            model |> focus |> withoutCmd
 
         HistoryMsg historyMsg ->
             model |> handleHistoryMsg historyMsg
+
+        ToggleHistoryMode shouldBeInteractive ->
+            let
+                toggle model =
+                    { model
+                        | historyMode =
+                            if shouldBeInteractive then
+                                Interactive
+                            else
+                                ReadOnly
+                    }
+            in
+            model |> toggle |> withoutCmd
 
         ToggleTranslationMode ->
             model |> toggleTranslationMode
@@ -141,21 +162,23 @@ toggleTranslationMode ({ i18nLookup, translationMode } as model) =
     case translationMode of
         Editing ->
             Debug.log "Done editing..."
-                { model | translationMode = ReadOnly }
+                { model | translationMode = NotEditing }
                 |> withCmds
                     [ storeTranslations (encodeLookup i18nLookup)
                     ]
 
-        ReadOnly ->
+        NotEditing ->
             { model | translationMode = Editing }
                 |> withoutCmd
 
 
 updateTranslation : TranslationKey -> TranslationValue -> Model -> ( Model, Cmd Msg )
 updateTranslation key value ({ i18nLookup } as model) =
+    -- TODO: sanitize user input!
     { model
         | i18nLookup = Dict.insert key value i18nLookup
     }
+        |> Debug.log ("Sanitized: " ++ value)
         |> withoutCmd
 
 
@@ -226,7 +249,7 @@ toolbar model =
 
 
 historyToolbar : Model -> List (Html Msg)
-historyToolbar { history } =
+historyToolbar ({ history } as model) =
     [ Html.button
         [ Attr.disabled (not (History.canStepBack history))
         , onClick (HistoryMsg StepBack)
@@ -240,6 +263,21 @@ historyToolbar { history } =
         [ Html.text "->"
         ]
     ]
+        ++ historyModeToggle model
+
+
+historyModeToggle : { a | historyMode : HistoryMode } -> List (Html Msg)
+historyModeToggle { historyMode } =
+    [ Html.label []
+        [ Html.input
+            [ Attr.checked (historyMode == Interactive)
+            , onCheck ToggleHistoryMode
+            , Attr.type_ "checkbox"
+            ]
+            []
+        , Html.text "Interactive?"
+        ]
+    ]
 
 
 
@@ -248,6 +286,7 @@ historyToolbar { history } =
 
 i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
 i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, translationMode } as model) attrs =
+    -- TODO: support for multi-line values?
     let
         ( value, focusAttrs ) =
             if focusedTranslatable == key then

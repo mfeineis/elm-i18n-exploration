@@ -17,7 +17,7 @@ type alias TranslationValue =
 
 type TranslationMode
     = Editing
-    | ReadOnly
+    | NotEditing
 
 
 i18n : TranslationKey -> msg -> msg -> (String -> msg) -> TranslationMode -> List (Attribute msg)
