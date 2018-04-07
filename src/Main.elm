@@ -25,6 +25,7 @@ main =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
+    -- TODO: we need to filter `Sub`s when in `Editing` mode!
     Sub.batch
         []
 
@@ -248,13 +249,13 @@ historyToolbar { history } =
 i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
 i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, translationMode } as model) attrs =
     let
-        value =
+        ( value, focusAttrs ) =
             if focusedTranslatable == key then
-                focusedValue
+                ( focusedValue, [ Attr.class "focused" ] )
             else
-                Intl.lookup defaultValue key i18nLookup
+                ( Intl.lookup defaultValue key i18nLookup, [ Attr.class "" ] )
     in
-    element (i18n key value model ++ attrs)
+    element (i18n key value model ++ focusAttrs ++ attrs)
         [ if focusedTranslatable == key && translationMode == Editing then
             -- While the element is focused we don't want Elm to tinker with the node
             Html.text focusedValue
@@ -306,6 +307,10 @@ html {
 
 .i18n--editing [data-i18n] {
     border: 3px dotted red;
+}
+
+.i18n--editing [data-i18n].focused {
+    background-color: #fdd;
 }
 
 pre {
