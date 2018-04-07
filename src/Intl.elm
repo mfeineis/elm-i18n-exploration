@@ -32,7 +32,7 @@ i18n key tagger mode =
       else
         Attr.class ""
     , if editable then
-        Events.on "input" (Decode.map tagger innerHtmlDecoder)
+        Events.on "input" (Decode.map tagger innerTextDecoder)
       else
         Attr.class ""
     ]
@@ -54,6 +54,6 @@ lookup defaultValue key lookup =
 -- See https://github.com/elm-lang/html/issues/24
 
 
-innerHtmlDecoder : Decoder String
-innerHtmlDecoder =
-    Decode.at [ "target", "innerHTML" ] Decode.string
+innerTextDecoder : Decoder String
+innerTextDecoder =
+    Decode.at [ "target", "innerText" ] Decode.string

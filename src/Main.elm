@@ -234,7 +234,7 @@ i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> Transl
 i15d element defaultValue key ({ i18nLookup, translationMode } as model) attrs =
     element (i18n key model ++ attrs)
         [ if translationMode == Editing then
-            Html.text ("[" ++ key ++ ": " ++ defaultValue ++ "]")
+            Html.text ("[" ++ defaultValue ++ "]")
           else
             Html.text (Intl.lookup defaultValue key i18nLookup)
         ]
