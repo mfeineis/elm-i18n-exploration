@@ -10,13 +10,24 @@ const devConfig = (env, argv, { mode, rootDir }) => {
         return {};
     }
 
+    const before = app => {
+        app.get("/api/i18n", (req, res) => {
+            res.json({ i18n: true });
+        });
+    };
+
     return {
         devServer: {
+            before,
             compress: true,
             contentBase: path.resolve(rootDir, "./dist"),
+            //host: "0.0.0.0",
             port: 8081,
         },
         mode,
+        //proxy: {
+        //    "/api": "http://localhost:3000"
+        //},
     };
 };
 
