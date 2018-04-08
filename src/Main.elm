@@ -1,13 +1,13 @@
 port module Main exposing (main)
 
-import Dict exposing (Dict)
+import Data.Translation as Translation
 import History exposing (History)
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
 import Html.Events as Events exposing (onCheck, onClick)
+import Http
 import Intl exposing (TranslationKey, TranslationMode(..), TranslationValue)
 import Json.Decode as Decode exposing (Decoder, Value)
-import Json.Encode as Encode
 
 
 port storeTranslations : Value -> Cmd msg
@@ -35,7 +35,7 @@ type alias Model =
     , focusedValue : TranslationValue
     , history : History AppModel
     , historyMode : HistoryMode
-    , i18nLookup : Dict TranslationKey TranslationValue
+    , i18nLookup : Intl.Lookup
     , translationMode : TranslationMode
     }
 
@@ -46,6 +46,7 @@ type Msg
     | HistoryMsg HistoryMsg
     | ToggleHistoryMode Bool
     | ToggleTranslationMode
+    | TranslationRequested (Result Http.Error Intl.Lookup)
     | UpdateTranslation TranslationKey TranslationValue
 
 
@@ -69,14 +70,14 @@ type alias AppModel =
 
 
 type alias Flags =
-    { translations : Dict TranslationKey TranslationValue
+    { translations : Intl.Lookup
     }
 
 
 flagsDecoder : Decoder Flags
 flagsDecoder =
     Decode.map Flags
-        (Decode.field "translations" (Decode.dict Decode.string))
+        (Decode.field "translations" Translation.decoder)
 
 
 init : Value -> ( Model, Cmd Msg )
@@ -89,7 +90,7 @@ init json =
 
                 Err reason ->
                     Debug.log ("Flags invalid: " ++ reason)
-                        { translations = Dict.empty
+                        { translations = Intl.empty
                         }
 
         _ =
@@ -102,7 +103,7 @@ init json =
       , i18nLookup = flags.translations
       , translationMode = NotEditing
       }
-    , Cmd.none
+    , Http.send TranslationRequested Translation.request
     )
 
 
@@ -156,6 +157,12 @@ update msg ({ history, historyMode, translationMode } as model) =
         ToggleTranslationMode ->
             model |> toggleTranslationMode
 
+        TranslationRequested (Ok lookup) ->
+            model |> (\model -> { model | i18nLookup = lookup } |> withoutCmd)
+
+        TranslationRequested (Err reason) ->
+            model |> Debug.log ("Failed to fetch translations: " ++ toString reason) |> withoutCmd
+
         UpdateTranslation key value ->
             model |> updateTranslation key value
 
@@ -189,7 +196,7 @@ toggleTranslationMode ({ i18nLookup, translationMode } as model) =
             Debug.log "Done editing..."
                 { model | translationMode = NotEditing }
                 |> withCmds
-                    [ storeTranslations (encodeLookup i18nLookup)
+                    [ storeTranslations (Intl.encode i18nLookup)
                     ]
 
         NotEditing ->
@@ -201,7 +208,7 @@ updateTranslation : TranslationKey -> TranslationValue -> Model -> ( Model, Cmd 
 updateTranslation key value ({ i18nLookup } as model) =
     -- TODO: sanitize user input!
     { model
-        | i18nLookup = Dict.insert key value i18nLookup
+        | i18nLookup = Intl.insert key value i18nLookup
     }
         |> Debug.log ("Sanitized: " ++ value)
         |> withoutCmd
@@ -236,9 +243,9 @@ renderApp ctx { counter } =
     , someButton ctx
         [ onClick (AppMsg Increment)
         ]
-    , searchInput ctx []
     , Html.text (toString counter)
     , someLabel ctx [ Attr.class "--different" ]
+    , searchInput ctx []
     ]
 
 
@@ -323,14 +330,14 @@ i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, 
             if focusedTranslatable == key then
                 ( focusedValue, [ Attr.class "focused" ] )
             else
-                ( Intl.lookup defaultValue key i18nLookup, [ Attr.class "" ] )
+                ( Intl.get defaultValue key i18nLookup, [ Attr.class "" ] )
     in
     element (i18n key value model ++ focusAttrs ++ attrs)
         [ if focusedTranslatable == key && translationMode == Editing then
             -- While the element is focused we don't want Elm to tinker with the node
             Html.text focusedValue
           else
-            Html.text (Intl.lookup defaultValue key i18nLookup)
+            Html.text (Intl.get defaultValue key i18nLookup)
         ]
 
 
@@ -342,14 +349,14 @@ i15dWithPlaceholder element defaultValue key ({ focusedTranslatable, focusedValu
             if focusedTranslatable == key then
                 ( focusedValue, [ Attr.class "focused" ] )
             else
-                ( Intl.lookup defaultValue key i18nLookup, [ Attr.class "" ] )
+                ( Intl.get defaultValue key i18nLookup, [ Attr.class "" ] )
 
         placeholder =
             [ if focusedTranslatable == key && translationMode == Editing then
                 -- While the element is focused we don't want Elm to tinker with the node
                 Attr.placeholder focusedValue
               else
-                Attr.placeholder (Intl.lookup defaultValue key i18nLookup)
+                Attr.placeholder (Intl.get defaultValue key i18nLookup)
             ]
     in
     element (i18n key value model ++ focusAttrs ++ attrs ++ placeholder) []
@@ -358,18 +365,6 @@ i15dWithPlaceholder element defaultValue key ({ focusedTranslatable, focusedValu
 i18n : TranslationKey -> TranslationValue -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
 i18n key value { translationMode } =
     Intl.i18n key (FocusTranslatable "" "") (FocusTranslatable key value) (UpdateTranslation key) translationMode
-
-
-encodeLookup : Dict TranslationKey TranslationValue -> Value
-encodeLookup =
-    encodeDict identity Encode.string
-
-
-encodeDict : (comparable -> String) -> (v -> Value) -> Dict comparable v -> Value
-encodeDict toKey toValue dict =
-    Dict.toList dict
-        |> List.map (\( key, value ) -> ( toKey key, toValue value ))
-        |> Encode.object
 
 
 withCmds : List (Cmd msg) -> model -> ( model, Cmd msg )

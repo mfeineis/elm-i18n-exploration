@@ -12,7 +12,9 @@ const devConfig = (env, argv, { mode, rootDir }) => {
 
     const before = app => {
         app.get("/api/i18n", (req, res) => {
-            res.json({ i18n: true });
+            res.json({
+                "some.button": "Increment (API)",
+            });
         });
     };
 

@@ -1,10 +1,26 @@
-module Intl exposing (TranslationKey, TranslationMode(..), TranslationValue, i18n, lookup)
+module Intl
+    exposing
+        ( Lookup
+        , TranslationKey
+        , TranslationMode(..)
+        , TranslationValue
+        , empty
+        , encode
+        , get
+        , i18n
+        , insert
+        )
 
 import Dict exposing (Dict)
 import Html exposing (Attribute)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Json.Decode as Decode exposing (Decoder)
+import Json.Decode as Decode exposing (Decoder, Value)
+import Json.Encode as Encode
+
+
+type alias Lookup =
+    Dict TranslationKey TranslationValue
 
 
 type alias TranslationKey =
@@ -20,6 +36,28 @@ type TranslationMode
     | NotEditing
 
 
+empty : Lookup
+empty =
+    Dict.empty
+
+
+insert : TranslationKey -> TranslationValue -> Lookup -> Lookup
+insert key value lookup =
+    Dict.insert key value lookup
+
+
+encode : Lookup -> Value
+encode =
+    encodeDict identity Encode.string
+
+
+encodeDict : (comparable -> String) -> (v -> Value) -> Dict comparable v -> Value
+encodeDict toKey toValue dict =
+    Dict.toList dict
+        |> List.map (\( key, value ) -> ( toKey key, toValue value ))
+        |> Encode.object
+
+
 i18n : TranslationKey -> msg -> msg -> (String -> msg) -> TranslationMode -> List (Attribute msg)
 i18n key captureBlur captureFocus mapInput mode =
     let
@@ -32,7 +70,7 @@ i18n key captureBlur captureFocus mapInput mode =
       else
         Attr.class ""
     , if editable then
-        Events.on "input" (Decode.map mapInput innerTextDecoder)
+        Events.on "input" (Decode.map mapInput editableContentDecoder)
       else
         Attr.class ""
     , if editable then
@@ -46,8 +84,8 @@ i18n key captureBlur captureFocus mapInput mode =
     ]
 
 
-lookup : TranslationValue -> TranslationKey -> Dict TranslationKey TranslationValue -> String
-lookup defaultValue key lookup =
+get : TranslationValue -> TranslationKey -> Lookup -> String
+get defaultValue key lookup =
     case Dict.get key lookup of
         Nothing ->
             defaultValue
@@ -62,8 +100,8 @@ lookup defaultValue key lookup =
 -- See https://github.com/elm-lang/html/issues/24
 
 
-innerTextDecoder : Decoder String
-innerTextDecoder =
+editableContentDecoder : Decoder String
+editableContentDecoder =
     Decode.oneOf
         [ Decode.at [ "target", "value" ] Decode.string
         , Decode.at [ "target", "innerText" ] Decode.string
