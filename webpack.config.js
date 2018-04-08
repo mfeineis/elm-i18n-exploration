@@ -14,6 +14,8 @@ const devConfig = (env, argv, { mode, rootDir }) => {
         app.get("/api/i18n", (req, res) => {
             res.json({
                 "some.button": "Increment (API)",
+                "some.label": "A simple counter",
+                "some.search": "Browse...",
             });
         });
     };

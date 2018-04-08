@@ -158,7 +158,10 @@ update msg ({ history, historyMode, translationMode } as model) =
             model |> toggleTranslationMode
 
         TranslationRequested (Ok lookup) ->
-            model |> (\model -> { model | i18nLookup = lookup } |> withoutCmd)
+            model
+                |> (\model -> { model | i18nLookup = lookup })
+                |> Debug.log "Fetched translations"
+                |> withoutCmd
 
         TranslationRequested (Err reason) ->
             model |> Debug.log ("Failed to fetch translations: " ++ toString reason) |> withoutCmd
