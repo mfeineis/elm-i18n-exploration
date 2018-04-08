@@ -4,6 +4,7 @@ module Intl
         , TranslationKey
         , TranslationMode(..)
         , TranslationValue
+        , decoder
         , empty
         , encode
         , get
@@ -44,6 +45,11 @@ empty =
 insert : TranslationKey -> TranslationValue -> Lookup -> Lookup
 insert key value lookup =
     Dict.insert key value lookup
+
+
+decoder : Decoder Lookup
+decoder =
+    Decode.dict Decode.string
 
 
 encode : Lookup -> Value

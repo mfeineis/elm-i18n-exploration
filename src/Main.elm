@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Data.Translation as Translation
+import Env
 import History exposing (History)
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
@@ -95,6 +96,9 @@ init json =
 
         _ =
             Debug.log "flags: " flags
+
+        _ =
+            Debug.log "env: " Env.id
     in
     ( { focusedTranslatable = ""
       , focusedValue = ""

@@ -1,5 +1,6 @@
 module Data.Translation exposing (decoder, request)
 
+import Env
 import Http
 import Intl
 import Json.Decode as Decode exposing (Decoder)
@@ -7,9 +8,9 @@ import Json.Decode as Decode exposing (Decoder)
 
 decoder : Decoder Intl.Lookup
 decoder =
-    Decode.dict Decode.string
+    Intl.decoder
 
 
 request : Http.Request Intl.Lookup
 request =
-    Http.get "/api/i18n" decoder
+    Http.get Env.translationEndpoint Intl.decoder
