@@ -64,4 +64,7 @@ lookup defaultValue key lookup =
 
 innerTextDecoder : Decoder String
 innerTextDecoder =
-    Decode.at [ "target", "innerText" ] Decode.string
+    Decode.oneOf
+        [ Decode.at [ "target", "value" ] Decode.string
+        , Decode.at [ "target", "innerText" ] Decode.string
+        ]

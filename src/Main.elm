@@ -80,10 +80,10 @@ flagsDecoder =
 
 
 init : Value -> ( Model, Cmd Msg )
-init jsonFlags =
+init json =
     let
         flags =
-            case Decode.decodeValue flagsDecoder jsonFlags of
+            case Decode.decodeValue flagsDecoder json of
                 Ok it ->
                     it
 
@@ -236,6 +236,7 @@ renderApp ctx { counter } =
     , someButton ctx
         [ onClick (AppMsg Increment)
         ]
+    , searchInput ctx []
     , Html.text (toString counter)
     , someLabel ctx [ Attr.class "--different" ]
     ]
@@ -244,6 +245,11 @@ renderApp ctx { counter } =
 someButton : Model -> List (Attribute Msg) -> Html Msg
 someButton =
     i15d Html.button "Some Button" "some.button"
+
+
+searchInput : Model -> List (Attribute Msg) -> Html Msg
+searchInput =
+    i15dWithPlaceholder Html.input "Search here..." "some.search"
 
 
 someLabel : Model -> List (Attribute Msg) -> Html Msg
@@ -328,6 +334,27 @@ i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, 
         ]
 
 
+i15dWithPlaceholder : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
+i15dWithPlaceholder element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, translationMode } as model) attrs =
+    -- TODO: support for multi-line values?
+    let
+        ( value, focusAttrs ) =
+            if focusedTranslatable == key then
+                ( focusedValue, [ Attr.class "focused" ] )
+            else
+                ( Intl.lookup defaultValue key i18nLookup, [ Attr.class "" ] )
+
+        placeholder =
+            [ if focusedTranslatable == key && translationMode == Editing then
+                -- While the element is focused we don't want Elm to tinker with the node
+                Attr.placeholder focusedValue
+              else
+                Attr.placeholder (Intl.lookup defaultValue key i18nLookup)
+            ]
+    in
+    element (i18n key value model ++ focusAttrs ++ attrs ++ placeholder) []
+
+
 i18n : TranslationKey -> TranslationValue -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
 i18n key value { translationMode } =
     Intl.i18n key (FocusTranslatable "" "") (FocusTranslatable key value) (UpdateTranslation key) translationMode
@@ -381,6 +408,11 @@ body {
 
 .i18n--editing [data-i18n].focused {
     background-color: #fdd;
+}
+
+input[contenteditable=true] {
+  /*content: attr(placeholder);*/
+  display: block; /* For Firefox */
 }
 
 pre {

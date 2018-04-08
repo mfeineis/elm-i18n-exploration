@@ -19,7 +19,7 @@ const devConfig = (env, argv, { mode, rootDir }) => {
     return {
         devServer: {
             before,
-            compress: true,
+            //compress: true,
             contentBase: path.resolve(rootDir, "./dist"),
             //host: "0.0.0.0",
             port: 8081,
