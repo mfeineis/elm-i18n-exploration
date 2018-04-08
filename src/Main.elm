@@ -1,6 +1,5 @@
 port module Main exposing (main)
 
-import App
 import Dict exposing (Dict)
 import History exposing (History)
 import Html exposing (Attribute, Html)
@@ -9,7 +8,6 @@ import Html.Events as Events exposing (onCheck, onClick)
 import Intl exposing (TranslationKey, TranslationMode(..), TranslationValue)
 import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
-import Vigor
 
 
 port storeTranslations : Value -> Cmd msg
@@ -17,52 +15,25 @@ port storeTranslations : Value -> Cmd msg
 
 main : Program Value Model Msg
 main =
-    let
-        counter =
-            App.vigor
-                { incoming =
-                    \msg { historyMode, translationMode } ->
-                        case msg of
-                            AppMsg it ->
-                                if historyMode == Interactive && translationMode == NotEditing then
-                                    Just it
-                                else
-                                    Nothing |> Debug.log ("Not interactive! Dropping " ++ toString it)
+    Html.programWithFlags
+        { init = init
+        , subscriptions = subscriptions
+        , update = update
+        , view = view
+        }
 
-                            _ ->
-                                Nothing
-                , outgoing = AppMsg
-                , read =
-                    \{ history } ->
-                        History.present history
-                , store =
-                    \({ history } as model) appModel ->
-                        if appModel == History.present history then
-                            model
-                        else
-                            { model | history = History.append appModel history }
-                }
 
-        compositeView model =
-            view { counter = counter.view model } model
-
-        shell =
-            { init = init
-            , subscriptions = \_ -> Sub.none
-            , update = update
-            , view = compositeView
-            }
-    in
-    Html.programWithFlags <|
-        Vigor.compose shell
-            [ counter
-            ]
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    -- TODO: we need to filter `Sub`s when in `Editing` mode!
+    Sub.batch
+        []
 
 
 type alias Model =
     { focusedTranslatable : TranslationKey
     , focusedValue : TranslationValue
-    , history : History App.Model
+    , history : History AppModel
     , historyMode : HistoryMode
     , i18nLookup : Dict TranslationKey TranslationValue
     , translationMode : TranslationMode
@@ -70,7 +41,7 @@ type alias Model =
 
 
 type Msg
-    = AppMsg App.Intent
+    = AppMsg AppMsg
     | FocusTranslatable TranslationKey TranslationValue
     | HistoryMsg HistoryMsg
     | ToggleHistoryMode Bool
@@ -88,6 +59,15 @@ type HistoryMode
     | ReadOnly
 
 
+type AppMsg
+    = Increment
+
+
+type alias AppModel =
+    { counter : Int
+    }
+
+
 type alias Flags =
     { translations : Dict TranslationKey TranslationValue
     }
@@ -100,21 +80,24 @@ flagsDecoder =
 
 
 init : Value -> ( Model, Cmd Msg )
-init json =
+init jsonFlags =
     let
         flags =
-            case Decode.decodeValue flagsDecoder json of
+            case Decode.decodeValue flagsDecoder jsonFlags of
                 Ok it ->
-                    Debug.log "Flags: " it
+                    it
 
                 Err reason ->
                     Debug.log ("Flags invalid: " ++ reason)
                         { translations = Dict.empty
                         }
+
+        _ =
+            Debug.log "flags: " flags
     in
     ( { focusedTranslatable = ""
       , focusedValue = ""
-      , history = History.init (App.init 0)
+      , history = History.init { counter = 0 }
       , historyMode = Interactive
       , i18nLookup = flags.translations
       , translationMode = NotEditing
@@ -126,8 +109,23 @@ init json =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg ({ history, historyMode, translationMode } as model) =
     case msg of
-        AppMsg _ ->
-            model |> withoutCmd
+        AppMsg appMsg ->
+            if historyMode == Interactive && translationMode == NotEditing then
+                let
+                    ( appModel, cmd ) =
+                        History.present history
+                            |> updateApp appMsg
+                in
+                if appModel == History.present history then
+                    ( model, cmd )
+                else
+                    ( { model
+                        | history = History.append appModel model.history
+                      }
+                    , cmd
+                    )
+            else
+                model |> Debug.log ("Not interactive! Dropping " ++ toString appMsg) |> withoutCmd
 
         FocusTranslatable key value ->
             let
@@ -160,6 +158,14 @@ update msg ({ history, historyMode, translationMode } as model) =
 
         UpdateTranslation key value ->
             model |> updateTranslation key value
+
+
+updateApp : AppMsg -> AppModel -> ( AppModel, Cmd Msg )
+updateApp msg ({ counter } as model) =
+    case msg of
+        Increment ->
+            { model | counter = counter + 1 }
+                |> withoutCmd
 
 
 handleHistoryMsg : HistoryMsg -> Model -> ( Model, Cmd Msg )
@@ -205,13 +211,8 @@ updateTranslation key value ({ i18nLookup } as model) =
 -- View
 
 
-type alias Partials =
-    { counter : Html Msg
-    }
-
-
-view : Partials -> Model -> Html Msg
-view partials ({ history, i18nLookup, translationMode } as model) =
+view : Model -> Html Msg
+view ({ history, i18nLookup, translationMode } as model) =
     let
         editing =
             translationMode == Editing
@@ -222,9 +223,32 @@ view partials ({ history, i18nLookup, translationMode } as model) =
           else
             Attr.class ""
         ]
-        [ toolbar model
-        , partials.counter
+        (List.concat
+            [ [ toolbar model ]
+            , renderApp model (History.present history)
+            ]
+        )
+
+
+renderApp : Model -> AppModel -> List (Html Msg)
+renderApp ctx { counter } =
+    [ someLabel ctx []
+    , someButton ctx
+        [ onClick (AppMsg Increment)
         ]
+    , Html.text (toString counter)
+    , someLabel ctx [ Attr.class "--different" ]
+    ]
+
+
+someButton : Model -> List (Attribute Msg) -> Html Msg
+someButton =
+    i15d Html.button "Some Button" "some.button"
+
+
+someLabel : Model -> List (Attribute Msg) -> Html Msg
+someLabel =
+    i15d Html.div "Hello, World!" "some.label"
 
 
 toggleModeButton : { a | translationMode : TranslationMode } -> List (Html Msg)
@@ -279,16 +303,6 @@ historyModeToggle { historyMode } =
         , Html.text "Interactive?"
         ]
     ]
-
-
-someButton : Model -> List (Attribute Msg) -> Html Msg
-someButton =
-    i15d Html.button "Some Button" "some.button"
-
-
-someLabel : Model -> List (Attribute Msg) -> Html Msg
-someLabel =
-    i15d Html.div "Hello, World!" "some.label"
 
 
 
