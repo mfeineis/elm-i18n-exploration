@@ -71,13 +71,15 @@ type alias AppModel =
 
 
 type alias Flags =
-    { translations : Intl.Lookup
+    { locales : List Intl.Locale
+    , translations : Intl.Lookup
     }
 
 
 flagsDecoder : Decoder Flags
 flagsDecoder =
-    Decode.map Flags
+    Decode.map2 Flags
+        (Decode.field "locales" (Decode.list Intl.localeDecoder))
         (Decode.field "translations" Translation.decoder)
 
 
@@ -91,7 +93,8 @@ init json =
 
                 Err reason ->
                     Debug.log ("Flags invalid: " ++ reason)
-                        { translations = Intl.empty
+                        { locales = [ Intl.locale "en-US" ]
+                        , translations = Intl.empty
                         }
 
         _ =
@@ -107,7 +110,7 @@ init json =
       , i18nLookup = flags.translations
       , translationMode = NotEditing
       }
-    , Http.send TranslationRequested Translation.request
+    , Http.send TranslationRequested (Translation.request flags.locales)
     )
 
 

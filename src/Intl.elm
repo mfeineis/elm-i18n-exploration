@@ -1,6 +1,8 @@
 module Intl
     exposing
-        ( Lookup
+        ( Language
+        , Locale
+        , Lookup
         , TranslationKey
         , TranslationMode(..)
         , TranslationValue
@@ -10,6 +12,8 @@ module Intl
         , get
         , i18n
         , insert
+        , locale
+        , localeDecoder
         )
 
 import Dict exposing (Dict)
@@ -20,8 +24,18 @@ import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
 
 
+type alias Language = String
+
+
+type alias Locale = String
+
+
 type alias Lookup =
-    Dict TranslationKey TranslationValue
+    { language : Language
+    , locale : Locale
+    , lookup : Dict TranslationKey TranslationValue
+    , supportedLocales : List Locale
+    }
 
 
 type alias TranslationKey =
@@ -37,31 +51,67 @@ type TranslationMode
     | NotEditing
 
 
+defaultLanguage : Locale
+defaultLanguage = "en"
+
+
+defaultLocale : Locale
+defaultLocale = "en-US"
+
+
 empty : Lookup
 empty =
-    Dict.empty
+    { language = defaultLanguage
+    , locale = defaultLocale
+    , lookup = Dict.empty
+    , supportedLocales = [defaultLocale]
+    }
 
 
 insert : TranslationKey -> TranslationValue -> Lookup -> Lookup
-insert key value lookup =
-    Dict.insert key value lookup
+insert key value ({ lookup } as it) =
+    { it | lookup = Dict.insert key value lookup }
 
 
 decoder : Decoder Lookup
 decoder =
-    Decode.dict Decode.string
+    Decode.map4 Lookup
+        (Decode.field "language" languageDecoder)
+        (Decode.field "locale" localeDecoder)
+        (Decode.field "lookup" (Decode.dict Decode.string))
+        (Decode.field "supportedLocales" (Decode.list localeDecoder))
+
+
+locale : String -> Locale
+locale locale =
+    locale
 
 
 encode : Lookup -> Value
-encode =
-    encodeDict identity Encode.string
-
+encode { language, locale, lookup, supportedLocales } =
+    Encode.object
+        [ ( "language", Encode.string language )
+        , ( "locale", Encode.string locale )
+        , ( "lookup", encodeDict identity Encode.string lookup )
+        , ( "supportedLocales", supportedLocales |> List.map Encode.string |> Encode.list )
+        ]
 
 encodeDict : (comparable -> String) -> (v -> Value) -> Dict comparable v -> Value
 encodeDict toKey toValue dict =
     Dict.toList dict
         |> List.map (\( key, value ) -> ( toKey key, toValue value ))
         |> Encode.object
+
+
+get : TranslationValue -> TranslationKey -> Lookup -> String
+get defaultValue key { lookup } =
+    case Dict.get key lookup of
+        Nothing ->
+            defaultValue
+
+        Just value ->
+            value
+
 
 
 i18n : TranslationKey -> msg -> msg -> (String -> msg) -> TranslationMode -> List (Attribute msg)
@@ -90,16 +140,6 @@ i18n key captureBlur captureFocus mapInput mode =
     ]
 
 
-get : TranslationValue -> TranslationKey -> Lookup -> String
-get defaultValue key lookup =
-    case Dict.get key lookup of
-        Nothing ->
-            defaultValue
-
-        Just value ->
-            value
-
-
 
 -- Custom decoder is necessary, because the default decoder looks for
 -- `event.target.value`, which doesn't exist on e.g. <div>s.
@@ -112,3 +152,18 @@ editableContentDecoder =
         [ Decode.at [ "target", "value" ] Decode.string
         , Decode.at [ "target", "innerText" ] Decode.string
         ]
+
+
+-- Helpers
+
+
+languageDecoder : Decoder Language
+languageDecoder =
+    Decode.string
+
+
+localeDecoder : Decoder Locale
+localeDecoder =
+    Decode.string
+
+

@@ -1,9 +1,16 @@
 const path = require("path");
 
+const { head, split } = require("ramda");
+
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const merge = require("webpack-merge");
 
 const pretty = it => JSON.stringify(it, null, "  ");
+
+const supportedLocales = [
+    "en-US",
+    "de-DE",
+];
 
 const devConfig = (env, argv, { mode, rootDir }) => {
     if (mode !== "development") {
@@ -11,11 +18,21 @@ const devConfig = (env, argv, { mode, rootDir }) => {
     }
 
     const before = app => {
-        app.get("/api/i18n", (req, res) => {
+        app.get("/api/i18n/:locales", (req, res) => {
+            const locales = (req.params.locales || "en-US").split(";");
+            const locale = head(locales);
+            const language = head(split("-", locale));
+
+            console.log(`/api/i18n/${JSON.stringify(locales)}`);
             res.json({
-                "some.button": "Increment (API)",
-                "some.label": "A simple counter",
-                "some.search": "Browse...",
+                language,
+                locale,
+                lookup: {
+                    "some.button": "Increment (API)",
+                    "some.label": "A simple counter",
+                    "some.search": "Browse...",
+                },
+                supportedLocales,
             });
         });
     };

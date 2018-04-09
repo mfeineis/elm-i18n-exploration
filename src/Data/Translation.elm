@@ -11,6 +11,10 @@ decoder =
     Intl.decoder
 
 
-request : Http.Request Intl.Lookup
-request =
-    Http.get Env.translationEndpoint Intl.decoder
+request : List Intl.Locale -> Http.Request Intl.Lookup
+request locales =
+    let
+        route =
+            "/" ++ (String.join ";" locales)
+    in
+    Http.get (Env.translationEndpoint ++ route) Intl.decoder
