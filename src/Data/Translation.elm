@@ -15,6 +15,6 @@ request : List Intl.Locale -> Http.Request Intl.Lookup
 request locales =
     let
         route =
-            "/" ++ (String.join ";" locales)
+            "/" ++ String.join ";" locales
     in
     Http.get (Env.translationEndpoint ++ route) Intl.decoder

@@ -36,7 +36,7 @@ type alias Model =
     , focusedValue : TranslationValue
     , history : History AppModel
     , historyMode : HistoryMode
-    , i18nLookup : Intl.Lookup
+    , i18n : Intl.Lookup
     , translationMode : TranslationMode
     }
 
@@ -107,7 +107,7 @@ init json =
       , focusedValue = ""
       , history = History.init { counter = 0 }
       , historyMode = Interactive
-      , i18nLookup = flags.translations
+      , i18n = flags.translations
       , translationMode = NotEditing
       }
     , Http.send TranslationRequested (Translation.request flags.locales)
@@ -166,7 +166,7 @@ update msg ({ history, historyMode, translationMode } as model) =
 
         TranslationRequested (Ok lookup) ->
             model
-                |> (\model -> { model | i18nLookup = lookup })
+                |> (\model -> { model | i18n = lookup })
                 |> Debug.log "Fetched translations"
                 |> withoutCmd
 
@@ -200,13 +200,13 @@ handleHistoryMsg msg ({ history } as model) =
 
 
 toggleTranslationMode : Model -> ( Model, Cmd Msg )
-toggleTranslationMode ({ i18nLookup, translationMode } as model) =
+toggleTranslationMode ({ i18n, translationMode } as model) =
     case translationMode of
         Editing ->
             Debug.log "Done editing..."
                 { model | translationMode = NotEditing }
                 |> withCmds
-                    [ storeTranslations (Intl.encode i18nLookup)
+                    [ storeTranslations (Intl.encode i18n)
                     ]
 
         NotEditing ->
@@ -215,10 +215,10 @@ toggleTranslationMode ({ i18nLookup, translationMode } as model) =
 
 
 updateTranslation : TranslationKey -> TranslationValue -> Model -> ( Model, Cmd Msg )
-updateTranslation key value ({ i18nLookup } as model) =
+updateTranslation key value ({ i18n } as model) =
     -- TODO: sanitize user input!
     { model
-        | i18nLookup = Intl.insert key value i18nLookup
+        | i18n = Intl.insert key value i18n
     }
         |> Debug.log ("Sanitized: " ++ value)
         |> withoutCmd
@@ -229,7 +229,7 @@ updateTranslation key value ({ i18nLookup } as model) =
 
 
 view : Model -> Html Msg
-view ({ history, i18nLookup, translationMode } as model) =
+view ({ history, i18n, translationMode } as model) =
     let
         editing =
             translationMode == Editing
@@ -291,9 +291,30 @@ toolbar model =
             [ [ baseStyle ]
             , toggleModeButton model
             , historyToolbar model
+            , languageSwitch model
             , [ Html.hr [] [] ]
             ]
         )
+
+
+languageSwitch : Model -> List (Html Msg)
+languageSwitch { i18n } =
+    let
+        option locale =
+            Html.option
+                [ Attr.value locale ]
+                [ Html.text locale ]
+    in
+    [ Html.select
+        [--Events.on "change" selectChangeDecoder SelectLanguage
+        ]
+        (List.map option (Intl.supportedLocales i18n))
+    ]
+
+
+selectChangeDecoder : Decoder Int
+selectChangeDecoder =
+    Decode.at [ "target", "valueAsNumber" ] Decode.int
 
 
 historyToolbar : Model -> List (Html Msg)
@@ -333,47 +354,47 @@ historyModeToggle { historyMode } =
 
 
 i15d : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
-i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, translationMode } as model) attrs =
+i15d element defaultValue key ({ focusedTranslatable, focusedValue, i18n, translationMode } as model) attrs =
     -- TODO: support for multi-line values?
     let
         ( value, focusAttrs ) =
             if focusedTranslatable == key then
                 ( focusedValue, [ Attr.class "focused" ] )
             else
-                ( Intl.get defaultValue key i18nLookup, [ Attr.class "" ] )
+                ( Intl.get defaultValue key i18n, [ Attr.class "" ] )
     in
-    element (i18n key value model ++ focusAttrs ++ attrs)
+    element (i18nAttr key value model ++ focusAttrs ++ attrs)
         [ if focusedTranslatable == key && translationMode == Editing then
             -- While the element is focused we don't want Elm to tinker with the node
             Html.text focusedValue
           else
-            Html.text (Intl.get defaultValue key i18nLookup)
+            Html.text (Intl.get defaultValue key i18n)
         ]
 
 
 i15dWithPlaceholder : (List (Attribute Msg) -> List (Html Msg) -> Html Msg) -> String -> TranslationKey -> Model -> List (Attribute Msg) -> Html Msg
-i15dWithPlaceholder element defaultValue key ({ focusedTranslatable, focusedValue, i18nLookup, translationMode } as model) attrs =
+i15dWithPlaceholder element defaultValue key ({ focusedTranslatable, focusedValue, i18n, translationMode } as model) attrs =
     -- TODO: support for multi-line values?
     let
         ( value, focusAttrs ) =
             if focusedTranslatable == key then
                 ( focusedValue, [ Attr.class "focused" ] )
             else
-                ( Intl.get defaultValue key i18nLookup, [ Attr.class "" ] )
+                ( Intl.get defaultValue key i18n, [ Attr.class "" ] )
 
         placeholder =
             [ if focusedTranslatable == key && translationMode == Editing then
                 -- While the element is focused we don't want Elm to tinker with the node
                 Attr.placeholder focusedValue
               else
-                Attr.placeholder (Intl.get defaultValue key i18nLookup)
+                Attr.placeholder (Intl.get defaultValue key i18n)
             ]
     in
-    element (i18n key value model ++ focusAttrs ++ attrs ++ placeholder) []
+    element (i18nAttr key value model ++ focusAttrs ++ attrs ++ placeholder) []
 
 
-i18n : TranslationKey -> TranslationValue -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
-i18n key value { translationMode } =
+i18nAttr : TranslationKey -> TranslationValue -> { a | translationMode : TranslationMode } -> List (Attribute Msg)
+i18nAttr key value { translationMode } =
     Intl.i18n key (FocusTranslatable "" "") (FocusTranslatable key value) (UpdateTranslation key) translationMode
 
 

@@ -14,6 +14,7 @@ module Intl
         , insert
         , locale
         , localeDecoder
+        , supportedLocales
         )
 
 import Dict exposing (Dict)
@@ -24,10 +25,12 @@ import Json.Decode as Decode exposing (Decoder, Value)
 import Json.Encode as Encode
 
 
-type alias Language = String
+type alias Language =
+    String
 
 
-type alias Locale = String
+type alias Locale =
+    String
 
 
 type alias Lookup =
@@ -52,11 +55,13 @@ type TranslationMode
 
 
 defaultLanguage : Locale
-defaultLanguage = "en"
+defaultLanguage =
+    "en"
 
 
 defaultLocale : Locale
-defaultLocale = "en-US"
+defaultLocale =
+    "en-US"
 
 
 empty : Lookup
@@ -64,7 +69,7 @@ empty =
     { language = defaultLanguage
     , locale = defaultLocale
     , lookup = Dict.empty
-    , supportedLocales = [defaultLocale]
+    , supportedLocales = [ defaultLocale ]
     }
 
 
@@ -96,11 +101,17 @@ encode { language, locale, lookup, supportedLocales } =
         , ( "supportedLocales", supportedLocales |> List.map Encode.string |> Encode.list )
         ]
 
+
 encodeDict : (comparable -> String) -> (v -> Value) -> Dict comparable v -> Value
 encodeDict toKey toValue dict =
     Dict.toList dict
         |> List.map (\( key, value ) -> ( toKey key, toValue value ))
         |> Encode.object
+
+
+supportedLocales : Lookup -> List Locale
+supportedLocales { supportedLocales } =
+    supportedLocales
 
 
 get : TranslationValue -> TranslationKey -> Lookup -> String
@@ -111,7 +122,6 @@ get defaultValue key { lookup } =
 
         Just value ->
             value
-
 
 
 i18n : TranslationKey -> msg -> msg -> (String -> msg) -> TranslationMode -> List (Attribute msg)
@@ -154,6 +164,7 @@ editableContentDecoder =
         ]
 
 
+
 -- Helpers
 
 
@@ -165,5 +176,3 @@ languageDecoder =
 localeDecoder : Decoder Locale
 localeDecoder =
     Decode.string
-
-
